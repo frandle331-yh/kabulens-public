@@ -1,223 +1,218 @@
 # KABULENS
 
-**TSE (Tokyo Stock Exchange) structural stock screener** built with React 19, TypeScript, and a layered scoring engine.
+東証上場3,700銘柄超を多層パイプラインで構造分析し、テンバガー候補を抽出するスクリーナー。
 
-Analyzes 3,700+ listed stocks through a multi-layer pipeline — from raw market data to cluster classification — and presents results through an interactive, filterable dashboard.
+React 19 + TypeScript + Vite で構築。完全クライアントサイド動作、GitHub Pages で静的ホスティング。
 
-> **Note**: This is a portfolio version. The scoring engine uses simplified demo parameters. The production version runs calibrated models against real J-Quants API data.
+> **本リポジトリについて**: スコアリングエンジンはデモ用の簡易パラメータを使用しています。本番環境では J-Quants API の実データに対してキャリブレーション済みモデルを適用します。
 
 ---
 
-## Architecture
+## アーキテクチャ
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  L1: Facts            J-Quants API → raw features       │
-│  (Data Ingestion)     OHLCV, financials, listed info    │
-├─────────────────────────────────────────────────────────┤
-│  L2: Computation      Normalization → Momentum →        │
-│  (Scoring Engine)     Cluster Classification →          │
-│                       Tenbagger Probability             │
-├─────────────────────────────────────────────────────────┤
-│  L3: Interpretation   LLM Theme Classification +       │
-│  (AI Layer)           Curated Expert Overrides          │
-├─────────────────────────────────────────────────────────┤
-│  UI: Presentation     React 19 + Tailwind + Recharts   │
-│  (This Repository)    Filter / Sort / Compare / Export  │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  L1: 事実層         J-Quants API → 生特徴量          │
+│                     株価・出来高・財務・上場情報       │
+├──────────────────────────────────────────────────────┤
+│  L2: 計算層         正規化 → モメンタム →             │
+│                     クラスター分類 → テンバガー確率   │
+├──────────────────────────────────────────────────────┤
+│  L3: 解釈層         LLM テーマ分類（Claude API）+    │
+│                     専門家キュレーション（42銘柄）     │
+├──────────────────────────────────────────────────────┤
+│  UI: 表示層         React 19 + Tailwind + Recharts   │
+│  （本リポジトリ）    フィルタ / ソート / 比較 / CSV   │
+└──────────────────────────────────────────────────────┘
 ```
 
-Each layer has a clear boundary and can be tested, replaced, or upgraded independently:
+各層は明確な境界を持ち、独立してテスト・差し替え・アップグレードが可能:
 
-- **L1** fetches and caches market data (price, volume, financials)
-- **L2** normalizes features and classifies stocks into 4 clusters (`tenbagger` / `large_growth` / `event_spike` / `noise`) using a rule-based priority chain
-- **L3** assigns investment theme tags using Claude API batch classification, with expert-curated overrides for key stocks
-- **UI** consumes a single `stocks-data.json` and renders everything client-side
+- **L1** — 市場データの取得とキャッシュ（OHLCV、決算、上場区分）
+- **L2** — 特徴量の正規化と4クラスター分類（`tenbagger` / `large_growth` / `event_spike` / `noise`）。ルールベースの if/else 優先チェーンで判定
+- **L3** — Claude API によるバッチテーマ分類 + 専門家による手動オーバーライド
+- **UI** — `stocks-data.json` 1ファイルを読み込み、全処理をクライアントサイドで実行
 
-## Tech Stack
+## 技術スタック
 
-| Category | Technology |
-|----------|-----------|
-| Framework | React 19 with TypeScript (strict mode) |
-| Build | Vite 5 |
-| Styling | Tailwind CSS 3 with custom dark theme |
-| Charts | Recharts 3 (radar, bar, pie) |
-| Icons | Lucide React |
-| Testing | Vitest 4 + Testing Library + jsdom |
-| Deployment | GitHub Pages (static) |
+| カテゴリ | 技術 |
+|---------|------|
+| フレームワーク | React 19 + TypeScript（strict モード） |
+| ビルド | Vite 5 |
+| スタイリング | Tailwind CSS 3（カスタムダークテーマ） |
+| チャート | Recharts 3（レーダー・棒・円） |
+| アイコン | Lucide React |
+| テスト | Vitest 4 + Testing Library + jsdom |
+| デプロイ | GitHub Pages（静的配信） |
 
-## Features
+## 機能
 
-### Ranking & Filtering
-- 6 sort axes (tenbagger probability, momentum, theme fit, growth, price, min purchase)
-- Multi-dimensional filters: purchase amount cap, SBI buyability, theme category, cluster exclusion
-- One-click filter presets ("Tenbagger Hunter", "Value Growth", "High Momentum")
-- Full-text search across ticker, name, theme tags, and growth type
+### ランキング・フィルタ
+- 6軸ソート（テンバガー適性、モメンタム、テーマ適合、成長の型、株価、最低購入額）
+- 多次元フィルタ：購入額上限、SBI購入可否、テーマカテゴリ、クラスター除外
+- ワンクリックプリセット（「テンバガー狙い」「割安成長」「高モメンタム」）
+- 全文検索（銘柄コード・名前・テーマタグ・成長タイプ横断）
 
-### Watchlist
-- Persistent watchlist via localStorage
-- Add/remove from any view
-- Dedicated watchlist tab with all stock details
+### ウォッチリスト
+- localStorage による永続化
+- どの画面からでも追加・削除
+- 専用タブで一覧表示
 
-### Stock Analysis
-- Per-stock detail modal with 5-axis radar chart
-- AI-generated evidence (3 items, 120-char limit each)
-- Risk assessment and cluster explanation
-- Data quality badge (A/B/C based on field completeness)
+### 銘柄分析
+- 5軸レーダーチャート付き詳細モーダル
+- AI 生成エビデンス（最大3件、各120文字制限）
+- リスク評価とクラスター解説
+- データ品質バッジ（A/B/C — フィールド充足度に基づく）
 
-### Multi-Stock Comparison
-- Side-by-side comparison of up to 4 stocks
-- Synchronized score bars and radar overlays
+### 比較ビュー
+- 最大4銘柄の横並び比較
+- スコアバー・レーダーの同期表示
 
-### Insights Dashboard
-- Aggregate statistics: tenbagger count, average probability, affordable stocks
-- Theme distribution and cluster breakdown charts
+### 統計ダッシュボード
+- KPI 集計：テンバガー候補数、平均確率、5万円以下で買える銘柄数
+- テーマ分布・クラスター構成チャート
 
-### Keyboard Shortcuts
-- `1`-`6` tab switching, `/` search focus, `Esc` modal close
+### キーボードショートカット
+- `1`-`6` タブ切替 / `/` 検索フォーカス / `Esc` モーダル閉じる
 
-## Component Architecture
+## コンポーネント設計
 
 ```
 App.tsx
-├── Header              (search, tabs, metadata)
-├── FilterBar           (presets, filters, sort)
-├── SummaryStats        (KPI cards)
-├── RankingView         (stock list)
-│   └── StockCard       (individual stock)
+├── Header              検索・タブ・メタデータ
+├── FilterBar           プリセット・フィルタ・ソート
+├── SummaryStats        KPI カード
+├── RankingView         銘柄リスト
+│   └── StockCard       個別銘柄カード
 │       ├── ClusterBadge
 │       ├── DataQualityBadge
 │       └── ScoreBar
-├── WatchlistView
-├── AnalysisPanel       (detail + radar chart)
+├── WatchlistView       ウォッチリスト
+├── AnalysisPanel       詳細分析 + レーダーチャート
 │   └── RadarChart
-├── CompareView         (side-by-side)
-├── InsightsView        (charts + stats)
-├── SettingsView        (config + presets)
-└── StockDetailModal    (full detail overlay)
+├── CompareView         横並び比較
+├── InsightsView        統計・チャート
+├── SettingsView        設定・プリセット管理
+└── StockDetailModal    詳細オーバーレイ
 ```
 
-### Design Principles
+### 設計原則
 
-**Separation of concerns** — UI components never call the engine directly. Data flows through hooks (`useStocks` → `useUIState` → filter utils), and components receive pre-processed props.
+**関心の分離** — UI コンポーネントはエンジンを直接呼ばない。データは hooks（`useStocks` → `useUIState` → フィルタユーティリティ）を経由し、コンポーネントは加工済みの props を受け取る。
 
-**Type-driven development** — The `Stock` interface (119 lines) is the single source of truth. Every component, hook, and utility is typed against it. No `any` types in the codebase.
+**型駆動開発** — `Stock` インターフェース（119行）が唯一の正。全コンポーネント・フック・ユーティリティがこの型に対して書かれている。`any` 型はゼロ。
 
-**Immutable state** — All filter/sort operations return new arrays. `useMemo` ensures recomputation only when dependencies change.
+**不変状態** — フィルタ・ソート操作は常に新しい配列を返す。`useMemo` で依存が変わったときだけ再計算。
 
-**Derived state over synced state** — `selectedStock` is derived from `selectedTicker + allStocks` via `useMemo`, not synchronized via `useEffect`. URL state is the source of truth.
+**導出状態 > 同期状態** — `selectedStock` は `selectedTicker + allStocks` から `useMemo` で導出。`useEffect` で同期しない。URL パラメータが状態の源。
 
-**Graceful degradation** — If `stocks-data.json` fails to load, the app falls back to built-in static data (45 curated stocks). No error screen, no broken state.
+**グレースフルデグラデーション** — `stocks-data.json` の読み込みに失敗した場合、組み込みの静的データ（45銘柄）にフォールバック。エラー画面にならない。
 
-## Scoring Engine Interface
+## スコアリングエンジン
 
-The engine processes raw market features through a deterministic pipeline:
+生の市場特徴量を決定論的パイプラインで処理:
 
 ```typescript
-// Input: raw market data per stock
+// 入力: 銘柄ごとの市場データ
 interface RawFeatures {
-  vol_ratio: number;         // Volume 5-day avg / 60-day avg
-  ma25_dev: number;          // 25-day moving average deviation
-  breakout_ratio: number;    // Proximity to 52-week high (0-1)
-  volatility: number;        // 20-day historical volatility
-  market_cap_billions: number;
-  yoy_sales_growth?: number;
-  gross_margin?: number;
+  vol_ratio: number;         // 出来高比率（5日平均 / 60日平均）
+  ma25_dev: number;          // 25日移動平均乖離率
+  breakout_ratio: number;    // 52週高値への接近度（0-1）
+  volatility: number;        // 20日ヒストリカルボラティリティ
+  market_cap_billions: number; // 時価総額（億円）
+  yoy_sales_growth?: number; // YoY 売上成長率
+  gross_margin?: number;     // 粗利率
 }
 
-// Output: fully scored stock
+// 出力: スコアリング済み銘柄
 interface Stock {
-  // Identity
-  ticker: string;
-  name: string;
-  market: string;
-
-  // Scores (0-100)
+  // スコア（各 0-100）
   scores: {
-    theme: number;      // L3: theme relevance
-    growth: number;     // L3: growth pattern fit
-    capital: number;    // L3: capital allocation
-    governance: number; // L3: management consistency
-    momentum: number;   // L2: computed from raw features
+    theme: number;      // L3: テーマ適合度
+    growth: number;     // L3: 成長パターン
+    capital: number;    // L3: 資本政策
+    governance: number; // L3: 経営一貫性
+    momentum: number;   // L2: 需給・勢い（数式算出）
   };
 
-  // Classification
+  // 分類
   derived: {
-    tenbagger_probability: number;  // 0-100, structural similarity
-    cluster_id: ClusterId;          // 4-class rule-based
-    cluster_explanation: string;    // max 120 chars
+    tenbagger_probability: number;  // 0-100 構造類似度
+    cluster_id: ClusterId;          // 4分類ルールベース
+    cluster_explanation: string;    // 最大120文字
   };
 
-  // Quality
-  data_quality: 'A' | 'B' | 'C';
+  // 品質
+  data_quality: 'A' | 'B' | 'C';   // フィールド充足度
   missing_fields: string[];
 }
 ```
 
-Key design decisions:
-- **`??` over `||`** for missing data imputation — preserves `0` (real zero growth) vs `null` (unknown)
-- **if/else priority chain** for clustering — ensures a tenbagger candidate with high momentum is never misclassified as `event_spike`
-- **Momentum excluded from tenbagger probability** — "currently rising" ≠ "structurally a tenbagger"
-- **Data quality debuff** — stocks with missing core fields receive probability penalties, preventing low-data stocks from ranking artificially high
+主要な設計判断:
 
-## Testing
+- **欠損補完は `??` を使い `||` を使わない** — `0`（ゼロ成長=実績値）と `null`（未取得）を区別する
+- **クラスター判定は if/else 優先チェーン** — テンバガー候補がモメンタムが高いからといって `event_spike` に誤分類されない
+- **テンバガー確率にモメンタムを含めない** — 「今上がっているか」と「テンバガー構造か」は別概念
+- **データ品質デバフ** — 欠損フィールドが多い銘柄にペナルティを課し、低データ銘柄の不当な高ランク入りを防止
+
+## テスト
 
 ```
-9 test files — 73 tests — all passing
+9 ファイル — 73 テスト — 全 pass
 
 src/components/__tests__/
-  ClusterBadge.test.tsx      4 tests   (label mapping per cluster)
-  DataQualityBadge.test.tsx  5 tests   (A/B/C display, missing field tooltip)
-  ScoreBar.test.tsx          4 tests   (label, value, percentage, color)
-  StockCard.test.tsx        11 tests   (render, click, watch, curated badge)
-  Header.test.tsx            9 tests   (tabs, search, badges, data source)
-  SummaryStats.test.tsx      5 tests   (KPI calculations, edge cases)
+  ClusterBadge.test.tsx      4件  クラスター別ラベル表示
+  DataQualityBadge.test.tsx  5件  A/B/C 表示・補完フィールドツールチップ
+  ScoreBar.test.tsx          4件  ラベル・値・パーセンテージ・色
+  StockCard.test.tsx        11件  表示・クリック・ウォッチ・キュレーションバッジ
+  Header.test.tsx            9件  タブ・検索・バッジ・データソース分岐
+  SummaryStats.test.tsx      5件  KPI 計算・エッジケース
 
 src/hooks/__tests__/
-  useWatchlist.test.ts       8 tests   (CRUD, dedup, localStorage, corruption)
-  useUIState.test.ts         8 tests   (filter ops, persistence, schema evolution)
+  useWatchlist.test.ts       8件  CRUD・重複防止・localStorage・破損データ耐性
+  useUIState.test.ts         8件  フィルタ操作・永続化・スキーマ進化
 
 src/utils/__tests__/
-  filters.test.ts           19 tests   (filter, sort, search combinations)
+  filters.test.ts           19件  フィルタ・ソート・検索の組合せ
 ```
 
-Testing strategy:
-- **Component tests** use Testing Library — query by role/text, not implementation details
-- **Hook tests** use `renderHook` + `act` — verify state transitions and localStorage persistence
-- **Corruption resilience** — invalid localStorage JSON gracefully falls back to defaults
-- **Schema evolution** — partial saved state merges correctly with new default fields
+テスト設計方針:
+- **コンポーネントテスト** — Testing Library でロール・テキストベースでクエリ（実装詳細に依存しない）
+- **フックテスト** — `renderHook` + `act` で状態遷移と localStorage 永続化を検証
+- **破損データ耐性** — 不正な localStorage JSON に対してデフォルト値にフォールバック
+- **スキーマ進化** — 旧バージョンの保存データが新しいデフォルトフィールドと正しくマージされる
 
-## Getting Started
+## セットアップ
 
 ```bash
-git clone https://github.com/frandle331-yh/kabulens-portfolio.git
-cd kabulens-portfolio
+git clone https://github.com/frandle331-yh/kabulens-public.git
+cd kabulens-public
 npm install
-npm run dev       # → http://localhost:5173/kabulens-portfolio/
-npm test          # → 73 tests pass
-npm run build     # → dist/ (static deployment ready)
+npm run dev       # → http://localhost:5173/kabulens-public/
+npm test          # → 73 テスト pass
+npm run build     # → dist/（静的デプロイ可）
 ```
 
-## Project Structure
+## ディレクトリ構成
 
 ```
 src/
-├── engine/          Scoring pipeline (demo parameters)
-│   ├── pipeline.ts  L2 orchestrator: normalize → score → classify
-│   ├── momentum.ts  Technical momentum aggregation
-│   ├── cluster.ts   Rule-based 4-class classification
-│   ├── tenbagger.ts Structural similarity scoring
-│   ├── normalize.ts Min-max normalization with clamp
-│   └── validation.ts Schema validation + data quality
-├── components/      15 React components (2,900 LOC total)
-├── hooks/           3 custom hooks (state, watchlist, data loading)
-├── utils/           Filter / sort / search / CSV export
-├── types/           Stock interface + filter types
-├── data/            Static fallback data (45 curated stocks)
-└── test/            Test setup + mock factories
+├── engine/          スコアリングパイプライン（デモパラメータ）
+│   ├── pipeline.ts  L2 オーケストレータ: 正規化→スコア→分類
+│   ├── momentum.ts  テクニカルモメンタム集計
+│   ├── cluster.ts   ルールベース 4 分類
+│   ├── tenbagger.ts 構造類似度スコアリング
+│   ├── normalize.ts Min-Max 正規化 + clamp
+│   └── validation.ts スキーマ検証 + データ品質判定
+├── components/      15 コンポーネント（計 2,900 行）
+├── hooks/           3 カスタムフック（データ・状態・ウォッチリスト）
+├── utils/           フィルタ / ソート / 検索 / CSV エクスポート
+├── types/           Stock インターフェース + フィルタ型定義
+├── data/            静的フォールバックデータ（45 銘柄）
+└── test/            テストセットアップ + モックファクトリ
 ```
 
-## License
+## ライセンス
 
-This project is shared for portfolio and educational purposes.
-The scoring engine parameters in this repository are simplified demos.
+本プロジェクトはポートフォリオ・教育目的で公開しています。
+スコアリングエンジンのパラメータは簡易デモ版です。
